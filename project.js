@@ -12,7 +12,7 @@ module.exports = function( options ) {
   var seneca = this
   var plugin   = 'project'
 
-  seneca.depends(plugin,['user','account'])
+  seneca.depends(plugin,['user','account', 'auth'])
 
 
   options = seneca.util.deepextend({
@@ -23,9 +23,9 @@ module.exports = function( options ) {
   },options)
 
 
-  if( options.web ) {
-    seneca.depends(plugin,['auth'])
-  }
+  // if( options.web ) {
+  //   seneca.depends(plugin,['auth'])
+  // }
 
 
   var projnid
@@ -97,8 +97,6 @@ module.exports = function( options ) {
 
 
   function save_project( args, done ) {
-    var projectent = this.make$('sys/project')
-
     var isnew = false
 
     if( args.id ) {
@@ -224,9 +222,6 @@ module.exports = function( options ) {
 
 
   function user_projects( args, done ) {
-
-    var projectent = this.make$('sys/project')
-
     var user = args.user
 
     // specifically assigned to projects
@@ -292,10 +287,36 @@ module.exports = function( options ) {
     })
   }
 
-
-
   function buildcontext( req, res, args, act, respond ) {
-    var user = req.seneca && req.seneca.user
+    var user = null
+
+    seneca.act({role: 'auth', cmd: 'is_using_bearer_token'},
+      function(err, out) {
+
+        if (err) console.error(err)
+
+        if (out.bearer) {
+          seneca.act({
+            role: 'auth',
+            cmd: 'load_user_by_bearer_token',
+            req$: req,
+            res$: res},
+            function(err, out){
+
+              if (err) return seneca.fail({code:'invalid'},respond)
+
+              if (!out.user) return seneca.fail({code:'invalid-bearer-token'},respond)
+              user = out.user
+
+            }
+          )
+        }
+        else {
+          user = req.seneca && req.seneca.user
+        }
+
+      }
+    )
 
     if( user ) {
       args.user = user
